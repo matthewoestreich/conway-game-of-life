@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Conway's Game of Life</title>
+		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous" />
+		<style>
+			html,
+			body {
+				height: 100%;
+				margin: 0;
+			}
+
+			table,
+			th,
+			td {
+				border: 1px solid gray;
+				border-collapse: collapse;
+			}
+
+			#grid-table {
+				cursor: pointer;
+			}
+
+			#grid-table.locked {
+				cursor: not-allowed;
+			}
+
+			.cell.alive {
+				background-color: black;
+			}
+
+      .form-range {
+        line-height: 0;
+      }
+
+      label, .form-label {
+        line-height: 0;
+        margin: 0;
+        margin-bottom: 0;
+      }
+		</style>
+	</head>
+	<body>
+		<div class="container-fluid h-100 d-flex flex-column">
+			<div class="row justify-content-center text-center">
+				<h1>Conway's Game of Life</h1>
+			</div>
+			<div class="row">
+				<div class="col-xl-6 offset-xl-3 border">
+					<p class="text-center" style="margin: 0;">
+						<small><b>Instructions:</b> Unlock grid, click/press in any cell AND move mouse/drag, lock grid, start</small>
+					</p>
+					<div class="row">
+						<div class="col-lg-4 offset-lg-2 col-6 text-center">
+							<label for="grid-size" class="form-label">Size</label>
+							<input type="range" class="form-range" id="grid-size" min="10" max="100" value="50" step="10" />
+						</div>
+						<div class="col-lg-4 col-6 text-center">
+							<label for="speed-range" class="form-label">Speed</label>
+							<input type="range" class="form-range" id="speed-range" min="1" max="500" value="200" step="1" />
+						</div>
+					</div>
+					<div class="row">
+						<div class="col-xl-8 offset-xl-2 col-12 text-center">
+							<button id="lock-unlock-btn" class="btn btn-sm btn-warning" type="button">Unlock</button>
+							<button id="start-btn" class="btn btn-sm btn-success" type="button">Start</button>
+							<button id="stop-btn" class="btn btn-sm btn-danger disabled" type="button">Stop</button>
+							<button id="tick-btn" class="btn btn-sm btn-info" type="button">Tick</button>
+							<button id="gosper-gun" class="btn btn-sm btn-outline-danger" type="button">Gosper</button>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div id="grid-display-row" class="row flex-fill m-0 mh-0 p-1" style="max-height:fit-content;"false">
+				<table id="grid-table" class="locked" draggable="false">
+					<tbody id="grid-display-tbody" draggable="false"></tbody>
+				</table>
+			</div>
+		</div>
+		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+		<script>
+			let STATE = {
+				grid: new2dArray(50),
+				locked: true,
+				speed: 500,
+				started: false,
+			};
+
+			const gridTable = document.getElementById("grid-table");
+			const gridDisplayTBody = document.getElementById("grid-display-tbody");
+			const lockUnlockBtn = document.getElementById("lock-unlock-btn");
+			const startBtn = document.getElementById("start-btn");
+			const stopBtn = document.getElementById("stop-btn");
+			const tickBtn = document.getElementById("tick-btn");
+			const speedRange = document.getElementById("speed-range");
+			const gridSizeRange = document.getElementById("grid-size");
+
+			document.getElementById("gosper-gun").addEventListener("click", () => {
+				STATE.grid = JSON.parse(
+					"[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,1,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,1,1,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]"
+				);
+				renderTable(STATE.grid, gridDisplayTBody);
+			});
+
+			const mouseMoveHandler = makeMouseMoveHandler();
+			const touchMoveHandler = makeTouchMoveHandler();
+			renderTable(STATE.grid, gridDisplayTBody);
+
+			/**
+			 * Game related
+			 */
+
+			function tick() {
+				return new Promise(async (resolve) => {
+					const newGrid = new2dArray(STATE.grid.length);
+
+					for (let i = 0; i < STATE.grid.length; i++) {
+						for (let j = 0; j < STATE.grid[i].length; j++) {
+							const neighbors = await getNeighbors(i, j);
+
+							if (STATE.grid[i][j] === 1) {
+								// Cell is alive
+								if (neighbors < 2) {
+									newGrid[i][j] = 0;
+								} else if (neighbors === 2 || neighbors === 3) {
+									newGrid[i][j] = 1;
+								} else {
+									newGrid[i][j] = 0;
+								}
+							} else if (neighbors === 3) {
+								// Cell is dead
+								newGrid[i][j] = 1;
+							}
+						}
+					}
+
+					resolve(newGrid);
+				});
+			}
+
+			function getNeighbors(row, col) {
+				return new Promise((resolve) => {
+					let count = 0;
+					const directions = [
+						[1, -1],
+						[0, -1],
+						[-1, -1],
+						[-1, 0],
+						[-1, 1],
+						[0, 1],
+						[1, 1],
+						[1, 0],
+					];
+
+					for (const [r, c] of directions) {
+						const newRow = row + r;
+						const newCol = col + c;
+
+						if (newRow < 0 || newCol < 0 || newRow >= STATE.grid[0].length || newCol >= STATE.grid.length) {
+							continue;
+						}
+						if (STATE.grid[newRow][newCol] === 1) {
+							count++;
+						}
+					}
+
+					resolve(count);
+				});
+			}
+
+			function sleep(ms) {
+				return new Promise((resolve) => {
+					setTimeout(resolve, ms);
+				});
+			}
+
+			/**
+			 * Display/HTML related
+			 */
+
+			function setFormControlsRunningState() {
+				startBtn.classList.toggle("disabled");
+				stopBtn.classList.toggle("disabled");
+				lockUnlockBtn.classList.toggle("disabled");
+				gridSizeRange.setAttribute("disabled", "true");
+				tickBtn.classList.toggle("disabled");
+			}
+
+			function setFormControlsStoppedState() {
+				startBtn.classList.toggle("disabled");
+				stopBtn.classList.toggle("disabled");
+				lockUnlockBtn.classList.toggle("disabled");
+				gridSizeRange.removeAttribute("disabled");
+				tickBtn.classList.toggle("disabled");
+			}
+
+			startBtn.addEventListener("click", async (event) => {
+				STATE.started = true;
+				setFormControlsRunningState();
+
+				while (STATE.started) {
+					const newGrid = await tick();
+					STATE.grid = newGrid;
+					await renderTable(STATE.grid, gridDisplayTBody);
+					await sleep(STATE.speed);
+				}
+			});
+
+			stopBtn.addEventListener("click", (event) => {
+				STATE.started = false;
+				setFormControlsStoppedState();
+			});
+
+			tickBtn.addEventListener("click", async (event) => {
+				const newGrid = await tick();
+				STATE.grid = newGrid;
+				renderTable(STATE.grid, gridDisplayTBody);
+			});
+
+			speedRange.addEventListener("input", (event) => {
+				const max = parseInt(speedRange.max) + 1;
+				const v = max - parseInt(event.target.value);
+				console.log(v);
+				STATE.speed = v;
+			});
+
+			gridSizeRange.addEventListener("input", async (event) => {
+				gridSizeRange.classList.toggle("disabled");
+				const v = parseInt(gridSizeRange.value);
+				STATE.grid = new2dArray(v);
+				await renderTable(STATE.grid, gridDisplayTBody);
+				gridSizeRange.classList.toggle("disabled");
+			});
+
+			gridTable.addEventListener("mousedown", (event) => {
+				event.preventDefault();
+				if (STATE.locked) {
+					return;
+				}
+				gridTable.addEventListener("mousemove", mouseMoveHandler);
+			});
+
+			gridTable.addEventListener("mouseup", (event) => {
+				event.preventDefault();
+				if (STATE.locked) {
+					return;
+				}
+				gridTable.removeEventListener("mousemove", mouseMoveHandler);
+			});
+
+			gridTable.addEventListener("touchstart", (event) => {
+				event.preventDefault();
+				if (STATE.locked) {
+					return;
+				}
+				gridTable.addEventListener("touchmove", touchMoveHandler);
+			});
+
+			gridTable.addEventListener("touchend", (event) => {
+				event.preventDefault();
+				if (STATE.locked) {
+					return;
+				}
+				gridTable.removeEventListener("touchmove", touchMoveHandler);
+			});
+
+			lockUnlockBtn.addEventListener("click", (event) => {
+				STATE.locked = !STATE.locked;
+				gridTable.classList.toggle("locked");
+				startBtn.classList.toggle("disabled");
+				tickBtn.classList.toggle("disabled");
+				if (STATE.locked) {
+					gridSizeRange.removeAttribute("disabled");
+					lockUnlockBtn.innerText = "Unlock";
+					lockUnlockBtn.classList.add("btn-warning");
+					lockUnlockBtn.classList.remove("btn-success");
+					return;
+				}
+				gridSizeRange.setAttribute("disabled", "true");
+				lockUnlockBtn.innerText = "Lock";
+				lockUnlockBtn.classList.add("btn-success");
+				lockUnlockBtn.classList.remove("btn-warning");
+			});
+
+			function renderTable(arr = [[]], appendToElement) {
+				return new Promise((resolve) => {
+					let html = ``;
+					for (let i = 0; i < arr.length; i++) {
+						html += `<tr class="cell-row" draggable="false">`;
+						for (let j = 0; j < arr[i].length; j++) {
+							const alive = arr[i][j] === 1 ? "alive" : "";
+							html += `<td class="cell ${alive} " id="${i},${j}" draggable="false"></td>`;
+						}
+						html += `</tr>`;
+					}
+					appendToElement.innerHTML = html;
+					resolve();
+				});
+			}
+
+			function new2dArray(size) {
+				return Array.from({ length: size }, () => {
+					return new Array(size).fill(0);
+				});
+			}
+
+			function makeMouseMoveHandler() {
+				let last;
+				return (event) => {
+					if (!(event.buttons | (event.button === 1)) || last === event.target.id) {
+						return false;
+					}
+					event.target.classList.toggle("alive");
+					last = event.target.id;
+					const [r, c] = last.split(",");
+					STATE.grid[r][c] = STATE.grid[r][c] === 0 ? 1 : 0;
+					return false;
+				};
+			}
+
+			function makeTouchMoveHandler() {
+				let last;
+				return (event) => {
+					const { clientX, clientY } = event.changedTouches[0];
+					const aboveElement = document.elementFromPoint(clientX, clientY);
+					if (aboveElement.id === last) {
+						return;
+					}
+					aboveElement.classList.toggle("alive");
+					last = aboveElement.id;
+					const [r, c] = last.split(",");
+					STATE.grid[r][c] = STATE.grid[r][c] === 0 ? 1 : 0;
+					return false;
+				};
+			}
+		</script>
+	</body>
+</html>
