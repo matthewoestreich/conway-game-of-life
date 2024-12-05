@@ -87,13 +87,6 @@
 		</div>
 		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 		<script>
-			let STATE = {
-				grid: new2dArray(50),
-				locked: true,
-				speed: 500,
-				started: false,
-			};
-
 			const gridTable = document.getElementById("grid-table");
 			const gridDisplayTBody = document.getElementById("grid-display-tbody");
 			const lockUnlockBtn = document.getElementById("lock-unlock-btn");
@@ -102,6 +95,13 @@
 			const tickBtn = document.getElementById("tick-btn");
 			const speedRange = document.getElementById("speed-range");
 			const gridSizeRange = document.getElementById("grid-size");
+
+			let STATE = {
+				grid: new2dArray(50),
+				locked: true,
+				speed: parseInt(speedRange.value) || 200,
+				started: false,
+			};
 
 			document.getElementById("gosper-gun").addEventListener("click", () => {
 				STATE.grid = JSON.parse(
